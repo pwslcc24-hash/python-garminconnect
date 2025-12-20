@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from garminconnect import Garmin
 import os
-from datetime import date
+from datetime import date, timedelta
 
 app = FastAPI()
 
