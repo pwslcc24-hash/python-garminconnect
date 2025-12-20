@@ -1,27 +1,22 @@
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import FastAPI
 from garminconnect import Garmin
 import os
-from datetime import date, timedelta
+from datetime import date
 
 app = FastAPI()
 
-API_KEY = os.getenv("SYNC_API_KEY", "")
-
 @app.get("/")
 def home():
-    return {"ok": True}
+    return {"status": "ok"}
 
-@app.post("/sync/sleep")
-def sync_sleep(x_api_key: str | None = Header(default=None)):
-    if API_KEY and x_api_key != API_KEY:
-        raise HTTPException(status_code=401, detail="Bad API key")
+@app.get("/sleep")
+def sleep():
+    email = os.getenv("GARMIN_EMAIL")
+    password = os.getenv("GARMIN_PASSWORD")
 
-    api = Garmin(os.getenv("GARMIN_EMAIL"), os.getenv("GARMIN_PASSWORD"))
-    api.login()
+    client = Garmin(email, password)
+    client.login()
 
-    d = (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
-    sleep = api.get_sleep_data(d)
-
-    # For now: just return the data so we know it works.
-    # Next step we will save it into your RevLuna database.
-    return {"date": d, "sleep": sleep}
+    d = date.today().isoformat()
+    data = client.get_sleep_data(d)
+    return {"date": d, "sleep": data}
