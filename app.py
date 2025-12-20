@@ -17,6 +17,6 @@ def sleep():
     client = Garmin(email, password)
     client.login()
 
-    d = date.today().isoformat()
+d = (date.today() - timedelta(days=1)).isoformat()
     data = client.get_sleep_data(d)
     return {"date": d, "sleep": data}
