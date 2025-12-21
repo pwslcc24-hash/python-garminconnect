@@ -1,9 +1,20 @@
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI
 from garminconnect import Garmin
 import os
 from datetime import date, timedelta
 
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "https://rev-luna-copy-ab1f5d2f.base44.app"
+    ],
+    allow_credentials=True,
+    allow_methods=["GET"],
+    allow_headers=["*"],
+)
+
 @app.get("/health")
 def health():
     return {"ok": True}
