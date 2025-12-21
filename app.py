@@ -4,6 +4,10 @@ import os
 from datetime import date, timedelta
 
 app = FastAPI()
+@app.get("/health")
+def health():
+    return {"ok": True}
+
 
 @app.get("/")
 def home():
