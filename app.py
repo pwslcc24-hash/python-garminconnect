@@ -6,13 +6,13 @@ from datetime import date, timedelta
 
 app = FastAPI()
 
-# CORS: allow Base44 preview + your Base44 production + your custom domain
+# ✅ CORS: allow Base44 preview + Base44 prod + RevLuna domain
 app.add_middleware(
     CORSMiddleware,
     allow_origin_regex=r"^https://preview-sandbox--.*\.base44\.app$|^https://.*\.base44\.app$|^https://(www\.)?revluna\.com$",
-    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
+    allow_credentials=False,
 )
 
 @app.get("/health")
@@ -29,13 +29,17 @@ def sleep():
     password = os.getenv("GARMIN_PASSWORD")
 
     if not email or not password:
-        return {"error": "Missing GARMIN_EMAIL or GARMIN_PASSWORD env vars"}
+        return {"error": "Missing GARMIN_EMAIL or GARMIN_PASSWORD"}
 
     client = Garmin(email, password)
     client.login()
 
-    d = (date.today() - timedelta(days=1)).isoformat()
-    data = client.get_sleep_data(d)
+    sleep_date = (date.today() - timedelta(days=1)).isoformat()
+    data = client.get_sleep_data(sleep_date)
 
-    return {"date": d, "sleep": data}
+    return {
+        "date": sleep_date,
+        "sleep": data
+    }
+
 
