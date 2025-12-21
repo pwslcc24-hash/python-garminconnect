@@ -1,31 +1,23 @@
-from flask import Flask
-from flask_cors import CORS
-
-app = Flask(__name__)
-CORS(app)
-
-
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from garminconnect import Garmin
 import os
 from datetime import date, timedelta
 
 app = FastAPI()
+
+# CORS: allow Base44 preview + your Base44 production + your custom domain
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://rev-luna-copy-ab1f5d2f.base44.app"
-    ],
-    allow_credentials=True,
-    allow_methods=["GET"],
+    allow_origin_regex=r"^https://preview-sandbox--.*\.base44\.app$|^https://.*\.base44\.app$|^https://(www\.)?revluna\.com$",
+    allow_credentials=False,
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
 @app.get("/health")
 def health():
     return {"ok": True}
-
 
 @app.get("/")
 def home():
@@ -36,6 +28,9 @@ def sleep():
     email = os.getenv("GARMIN_EMAIL")
     password = os.getenv("GARMIN_PASSWORD")
 
+    if not email or not password:
+        return {"error": "Missing GARMIN_EMAIL or GARMIN_PASSWORD env vars"}
+
     client = Garmin(email, password)
     client.login()
 
@@ -43,3 +38,4 @@ def sleep():
     data = client.get_sleep_data(d)
 
     return {"date": d, "sleep": data}
+
