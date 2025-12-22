@@ -6,7 +6,7 @@ from datetime import date, timedelta
 
 app = FastAPI()
 
-# ✅ CORS: allow Base44 preview + Base44 prod + RevLuna domain
+# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origin_regex=r"^https://preview-sandbox--.*\.base44\.app$|^https://.*\.base44\.app$|^https://(www\.)?revluna\.com$",
@@ -34,12 +34,21 @@ def sleep():
     client = Garmin(email, password)
     client.login()
 
-    sleep_date = (date.today() - timedelta(days=1)).isoformat()
-    data = client.get_sleep_data(sleep_date)
+    # Try today first
+    today = date.today().isoformat()
+    data = client.get_sleep_data(today)
+    sleep_date = today
+
+    # If Garmin hasn't published today yet, fall back to yesterday
+    if not data or not data.get("dailySleepDTO"):
+        yesterday = (date.today() - timedelta(days=1)).isoformat()
+        data = client.get_sleep_data(yesterday)
+        sleep_date = yesterday
 
     return {
         "date": sleep_date,
         "sleep": data
     }
+
 
 
