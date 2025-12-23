@@ -15,8 +15,8 @@ app.add_middleware(
     allow_credentials=False,
 )
 
-# ===== MVP IN-MEMORY SESSION STORE =====
-# key: user_id (from Base44)
+# ===== IN-MEMORY SESSION STORE =====
+# key: Base44 user_id
 # value: logged-in Garmin client
 GARMIN_SESSIONS = {}
 
@@ -35,7 +35,7 @@ def home():
 def health():
     return {"ok": True}
 
-# ===== CONNECT GARMIN (LOGIN ONCE) =====
+# ===== CONNECT GARMIN =====
 @app.post("/connect-garmin")
 def connect_garmin(body: GarminLogin):
     try:
@@ -43,10 +43,10 @@ def connect_garmin(body: GarminLogin):
         client.login()
         GARMIN_SESSIONS[body.user_id] = client
         return {"status": "connected"}
-    except Exception as e:
+    except Exception:
         return {"error": "Garmin login failed"}
 
-# ===== GARMIN CONNECTION STATUS =====
+# ===== GARMIN STATUS =====
 @app.get("/garmin-status")
 def garmin_status(user_id: str):
     return {"connected": user_id in GARMIN_SESSIONS}
@@ -54,11 +54,26 @@ def garmin_status(user_id: str):
 # ===== DISCONNECT GARMIN =====
 @app.post("/disconnect-garmin")
 def disconnect_garmin(user_id: str):
-    if user_id in GARMIN_SESSIONS:
-        del GARMIN_SESSIONS[user_id]
+    GARMIN_SESSIONS.pop(user_id, None)
     return {"status": "disconnected"}
 
-# ===== SYNC SLEEP =====
+# ===== HELPER: CHECK IF SLEEP IS REAL =====
+def has_real_sleep(data: dict) -> bool:
+    dto = data.get("dailySleepDTO") if data else None
+    if not dto:
+        return False
+
+    return any([
+        dto.get("sleepTimeSeconds"),
+        dto.get("sleepStartTimestampGMT"),
+        dto.get("sleepEndTimestampGMT"),
+        dto.get("deepSleepSeconds"),
+        dto.get("lightSleepSeconds"),
+        dto.get("remSleepSeconds"),
+        dto.get("awakeSleepSeconds"),
+    ])
+
+# ===== SYNC SLEEP (NEWEST VALID ONLY) =====
 @app.get("/sleep")
 def sleep(user_id: str):
     client = GARMIN_SESSIONS.get(user_id)
@@ -66,18 +81,18 @@ def sleep(user_id: str):
     if not client:
         return {"error": "Garmin not connected"}
 
-    # Try today first
-    today = date.today().isoformat()
-    data = client.get_sleep_data(today)
-    sleep_date = today
+    # Look back up to 7 days and return newest REAL sleep
+    for days_back in range(0, 7):
+        check_date = (date.today() - timedelta(days=days_back)).isoformat()
+        data = client.get_sleep_data(check_date)
 
-    # Fallback to yesterday if Garmin hasn't published today yet
-    if not data or not data.get("dailySleepDTO"):
-        yesterday = (date.today() - timedelta(days=1)).isoformat()
-        data = client.get_sleep_data(yesterday)
-        sleep_date = yesterday
+        if has_real_sleep(data):
+            return {
+                "date": check_date,
+                "sleep": data
+            }
 
     return {
-        "date": sleep_date,
-        "sleep": data
+        "error": "No valid Garmin sleep data found"
     }
+
