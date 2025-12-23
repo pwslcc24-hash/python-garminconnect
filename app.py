@@ -15,9 +15,7 @@ app.add_middleware(
     allow_credentials=False,
 )
 
-# ===== IN-MEMORY SESSION STORE =====
-# key: Base44 user_id
-# value: logged-in Garmin client
+# ===== IN-MEMORY GARMIN SESSIONS =====
 GARMIN_SESSIONS = {}
 
 # ===== MODELS =====
@@ -57,23 +55,7 @@ def disconnect_garmin(user_id: str):
     GARMIN_SESSIONS.pop(user_id, None)
     return {"status": "disconnected"}
 
-# ===== HELPER: CHECK IF SLEEP IS REAL =====
-def has_real_sleep(data: dict) -> bool:
-    dto = data.get("dailySleepDTO") if data else None
-    if not dto:
-        return False
-
-    return any([
-        dto.get("sleepTimeSeconds"),
-        dto.get("sleepStartTimestampGMT"),
-        dto.get("sleepEndTimestampGMT"),
-        dto.get("deepSleepSeconds"),
-        dto.get("lightSleepSeconds"),
-        dto.get("remSleepSeconds"),
-        dto.get("awakeSleepSeconds"),
-    ])
-
-# ===== SYNC SLEEP (NEWEST VALID ONLY) =====
+# ===== SLEEP (NEWEST REAL) =====
 @app.get("/sleep")
 def sleep(user_id: str):
     client = GARMIN_SESSIONS.get(user_id)
@@ -81,18 +63,28 @@ def sleep(user_id: str):
     if not client:
         return {"error": "Garmin not connected"}
 
-    # Look back up to 7 days and return newest REAL sleep
     for days_back in range(0, 7):
         check_date = (date.today() - timedelta(days=days_back)).isoformat()
         data = client.get_sleep_data(check_date)
 
-        if has_real_sleep(data):
+        dto = data.get("dailySleepDTO") if data else None
+        if dto and dto.get("sleepTimeSeconds"):
             return {
                 "date": check_date,
                 "sleep": data
             }
 
-    return {
-        "error": "No valid Garmin sleep data found"
-    }
+    return {"error": "No sleep found"}
+
+# ===== HRV (TODAY) =====
+@app.get("/hrv")
+def hrv(user_id: str):
+    client = GARMIN_SESSIONS.get(user_id)
+
+    if not client:
+        return {"error": "Garmin not connected"}
+
+    today = date.today().isoformat()
+    return client.get_hrv_data(today)
+
 
